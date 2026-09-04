@@ -2,6 +2,11 @@ name: Build QModem for ImmortalWrt 25.12.1
 
 on:
   workflow_dispatch:
+    inputs:
+      arch:
+        description: '目标架构 (如 x86_64, mediatek_filogic, armsr_armv8)'
+        required: true
+        default: 'x86_64'
 
 jobs:
   build:
@@ -50,9 +55,9 @@ jobs:
             sed -i 's/20260503/20260213/g' "$f"
             sed -i 's/20260628/20260213/g' "$f"
           done
-          # 检查修补结果
+          # 检查修补结果（加上 || true 防止没匹配到时导致 Action 报错退出）
           echo "=== 修补后的依赖声明 ==="
-          grep -r "DEPENDS" package/feeds/qmodem/ | grep "libu"
+          grep -r "DEPENDS" package/feeds/qmodem/ | grep "libubox" || true
 
       - name: 9. 编译基础工具链
         run: make tools/compile -j$(nproc)
