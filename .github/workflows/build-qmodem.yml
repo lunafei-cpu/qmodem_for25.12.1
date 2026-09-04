@@ -2,11 +2,6 @@ name: Build QModem for ImmortalWrt 25.12.1
 
 on:
   workflow_dispatch:
-    inputs:
-      arch:
-        description: '目标架构 (如 x86_64, mediatek_filogic, armsr_armv8)'
-        required: true
-        default: 'x86_64' # 注意：根据你之前的日志，如果是红米AX6000等路由器，请改成 mediatek_filogic
 
 jobs:
   build:
@@ -45,19 +40,33 @@ jobs:
           echo 'CONFIG_PACKAGE_luci-app-qmodem-next=m' >> .config
           make defconfig
 
-      - name: 8. 编译基础工具链 (修复 host openssl 缺失)
+      - name: 8. 修补 QModem ABI 依赖版本 (关键修复)
+        run: |
+          # 将 QModem 中所有高版本 ABI 引用替换为 v25.12.1 源码树中的版本
+          # 涉及: 20260708/20260503/20260628 -> 20260213
+          for f in $(find package/feeds/qmodem -name Makefile); do
+            echo "正在修补: $f"
+            sed -i 's/20260708/20260213/g' "$f"
+            sed -i 's/20260503/20260213/g' "$f"
+            sed -i 's/20260628/20260213/g' "$f"
+          done
+          # 检查修补结果
+          echo "=== 修补后的依赖声明 ==="
+          grep -r "DEPENDS" package/feeds/qmodem/ | grep "libu"
+
+      - name: 9. 编译基础工具链
         run: make tools/compile -j$(nproc)
 
-      - name: 9. 编译 libopenssl (确保依赖完整)
+      - name: 10. 编译 libopenssl
         run: make package/libs/openssl/compile -j$(nproc)
 
-      - name: 10. 编译 QModem (单线程排错)
+      - name: 11. 编译 QModem
         run: make package/qmodem/compile V=s -j1
 
-      - name: 11. 编译 luci-app-qmodem-next (单线程排错)
+      - name: 12. 编译 luci-app-qmodem-next
         run: make package/luci-app-qmodem-next/compile V=s -j1
 
-      - name: 12. 上传编译好的 APK
+      - name: 13. 上传 APK
         uses: actions/upload-artifact@v4
         with:
           name: qmodem-apks
